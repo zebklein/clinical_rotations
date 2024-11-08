@@ -34,23 +34,26 @@ RotationMap parseInput(const string& filename) {
     }
 
     string line;
-    int round = 1;
     vector<string> rotations = { "MED", "OBGY", "PEDS", "PSYC", "SURG", "FMED" };
-    int rotationIndex = 0;
+    int lineIndex = 0;
 
-    // Read each line and populate the map
-    while (getline(file, line)) {
+    // Read each line and map it to the appropriate round and rotation type
+    while (getline(file, line) && lineIndex < 36) {
+        int round = (lineIndex / 6) + 1;                // Calculate round (1 to 6)
+        string rotationType = rotations[lineIndex % 6]; // Determine rotation type based on line index
+
+        RotationKey key(round, rotationType);
         istringstream ss(line);
         string name;
 
+        // Parse comma-separated names on the line
         while (getline(ss, name, ',')) {
+            // Trim whitespace from the name
             name = name.substr(name.find_first_not_of(" "), name.find_last_not_of(" ") + 1);
-            RotationKey key(round, rotations[rotationIndex % 6]);
             rotationMap[key].push_back(name);
-            rotationIndex++;
-
-            if (rotationIndex % 6 == 0) round++;
         }
+
+        lineIndex++;
     }
 
     file.close();
@@ -64,8 +67,10 @@ RotationMap parseInput(const string& filename) {
         }
         cout << "\n";
     }
+
     return rotationMap;
 }
+
 
 // Function to find direct and single-step indirect swaps
 void findSwaps(const RotationMap& rotationMap, const string& targetStudent) {
@@ -73,51 +78,57 @@ void findSwaps(const RotationMap& rotationMap, const string& targetStudent) {
     RotationKey target2(5, "PEDS");
 
     bool foundDirect = false;
+    bool foundIndirect = false;
 
     // Check for direct swaps
     cout << "\nChecking for direct swaps...\n";
     for (const auto& student : rotationMap.at(target1)) {
-        if (find(rotationMap.at(target2).begin(), rotationMap.at(target2).end(), student) != rotationMap.at(target2).end()) {
+        // Ensure the student is not the target student to avoid swapping with oneself
+        if (student != targetStudent && find(rotationMap.at(target2).begin(), rotationMap.at(target2).end(), student) != rotationMap.at(target2).end()) {
             cout << "Direct swap found with student: " << student << endl;
             foundDirect = true;
-            break;
         }
     }
 
     if (!foundDirect) {
-        cout << "No direct swap found. Checking for single-step indirect swaps...\n";
+        cout << "No direct swaps found.\n";
+    }
 
-        // Check for students in SURG on round 2 and other rotations in round 5
-        for (const auto& studentInSURG : rotationMap.at(target1)) {
-            for (const auto& entry : rotationMap) {
-                const auto& roundRotation = entry.first;
-                const auto& students = entry.second;
+    // Check for single-step indirect swaps
+    cout << "\nChecking for single-step indirect swaps...\n";
+    for (const auto& studentInSURG : rotationMap.at(target1)) {
+        if (studentInSURG == targetStudent) continue; // Skip if the student is the target student
 
-                if (roundRotation.first == 5 && roundRotation.second != "PEDS") {
-                    for (const auto& studentInRound5 : students) {
-                        if (studentInRound5 == studentInSURG) {
-                            // Look for students in PEDS on round 5 who can swap indirectly
-                            for (const auto& studentInPEDS : rotationMap.at(target2)) {
-                                if (find(rotationMap.at({ 2, roundRotation.second }).begin(), rotationMap.at({ 2, roundRotation.second }).end(), studentInPEDS) != rotationMap.at({ 2, roundRotation.second }).end()) {
-                                    cout << "Indirect swap sequence found:\n";
-                                    cout << "1. Swap " << studentInSURG << " in SURG round 2 with " << studentInRound5 << " in " << roundRotation.second << " round 5.\n";
-                                    cout << "2. Then swap " << studentInRound5 << " in PEDS round 5 with " << studentInPEDS << " in " << roundRotation.second << " round 2.\n";
-                                    return;
-                                }
-                            }
+        for (const auto& entry : rotationMap) {
+            const auto& roundRotation = entry.first;
+            const auto& students = entry.second;
+
+            if (roundRotation.first == 5 && roundRotation.second != "PEDS") {
+                for (const auto& studentInRound5 : students) {
+                    if (studentInRound5 == targetStudent || studentInRound5 == studentInSURG) continue; // Skip if the student would swap with themselves
+
+                    // Look for students in PEDS on round 5 who can swap indirectly
+                    for (const auto& studentInPEDS : rotationMap.at(target2)) {
+                        if (studentInPEDS != targetStudent && find(rotationMap.at({ 2, roundRotation.second }).begin(), rotationMap.at({ 2, roundRotation.second }).end(), studentInPEDS) != rotationMap.at({ 2, roundRotation.second }).end()) {
+                            cout << "Indirect swap sequence found:\n";
+                            cout << "1. Swap " << studentInSURG << " in SURG round 2 with " << studentInRound5 << " in " << roundRotation.second << " round 5.\n";
+                            cout << "2. Then swap " << studentInRound5 << " in PEDS round 5 with " << studentInPEDS << " in " << roundRotation.second << " round 2.\n";
+                            foundIndirect = true;
                         }
                     }
                 }
             }
         }
+    }
 
-        cout << "No single-step indirect swap found." << endl;
+    if (!foundIndirect) {
+        cout << "No single-step indirect swaps found." << endl;
     }
 }
 
 int main() {
     string targetStudent = "Phoebe Sotiroff";
-    RotationMap rotationMap = parseInput("input.txt");
+    RotationMap rotationMap = parseInput("C:\\Users\\zebkl\\code\\clinical_rotations\\input.txt");
 
     // Check if target student is in the rotation map
     bool found = false;
